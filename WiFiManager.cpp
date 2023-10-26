@@ -4,6 +4,7 @@
 #include "freertos/event_groups.h"
 #include "lwip/ip4_addr.h"
 #include "Core.h"
+#include "cJSON.h"
 
 const static char *WiFiSsidKey = "ssid";
 
@@ -55,7 +56,7 @@ void WiFiManager::Startup()
   esp_netif_set_ip_info(wifiAP, &ipInfo);
   esp_netif_dhcps_start(wifiAP);
 
-  char *host = WiFiConfig.Get_AP_hide_ssid();
+  char *host = WiFiConfig->Get_AP_hide_ssid();
 
   esp_netif_set_hostname(wifiAP, host);
 
@@ -92,16 +93,16 @@ void WiFiManager::Loop()
     return;
   }
 
-  if (event->isSubtype(EventSubtypeTypeWiFI_ApOff))
+  if (event->isSubtype(EventSubtypeWiFI_ApOff))
   {
-    WiFiConfig.Set_AP_ssid(nullptr);
-    WiFiConfig.Set_AP_pass(nullptr);
-    WiFiConfig.Set_AP_Configured(false);
+    WiFiConfig->Set_AP_ssid(nullptr);
+    WiFiConfig->Set_AP_pass(nullptr);
+    WiFiConfig->Set_AP_Configured(false);
     reloadApSettings();
     _subscriber->Done();
   }
 
-  if (event->isSubtype(EventSubtypeTypeWiFI_ApSettings))
+  if (event->isSubtype(EventSubtypeWiFI_ApSettings))
   {
     cJSON *jsonNada = cJSON_Parse((char *)event->getValue());
 
@@ -117,9 +118,9 @@ void WiFiManager::Loop()
         strlen(tmpPass->valuestring) < 64 &&
         strlen(tmpPass->valuestring) >= 8)
     {
-      WiFiConfig.Set_AP_ssid(tmpSsid->valuestring);
-      WiFiConfig.Set_AP_pass(tmpPass->valuestring);
-      WiFiConfig.Set_AP_Configured(true);
+      WiFiConfig->Set_AP_ssid(tmpSsid->valuestring);
+      WiFiConfig->Set_AP_pass(tmpPass->valuestring);
+      WiFiConfig->Set_AP_Configured(true);
       reloadApSettings();
       status = cJSON_CreateNumber(1);
     }
@@ -140,19 +141,19 @@ void WiFiManager::Loop()
     _subscriber->Done();
   }
 
-  if (event->isSubtype(EventSubtypeTypeWiFI_Status))
+  if (event->isSubtype(EventSubtypeWiFI_Status))
   {
     esp_netif_ip_info_t ip_info;
     cJSON *json = cJSON_CreateObject();
 
     cJSON *jsta = cJSON_CreateObject();
 
-    char *name = WiFiConfig.Get_AP_hide_ssid();
+    char *name = WiFiConfig->Get_AP_hide_ssid();
     cJSON *jname = cJSON_CreateString(name);
     cJSON_AddItemToObject(json, "name", jname);
     free(name);
 
-    if (WiFiConfig.Get_STA_Configured())
+    if (WiFiConfig->Get_STA_Configured())
     {
       esp_netif_get_ip_info(wifiSTA, &ip_info);
       char *staip = (char *)malloc(sizeof(char) * 16);
@@ -161,7 +162,7 @@ void WiFiManager::Loop()
       cJSON_AddItemToObject(jsta, "ip", staipj);
       free(staip);
 
-      char *stassid = WiFiConfig.Get_STA_ssid();
+      char *stassid = WiFiConfig->Get_STA_ssid();
       cJSON *jstassid = cJSON_CreateString(stassid);
       cJSON_AddItemToObject(jsta, WiFiSsidKey, jstassid);
       free(stassid);
@@ -189,19 +190,19 @@ void WiFiManager::Loop()
     cJSON_AddItemToObject(json, "sta", jsta);
 
     cJSON *ap = cJSON_CreateObject();
-    char *apssid = WiFiConfig.Get_AP_ssid();
+    char *apssid = WiFiConfig->Get_AP_ssid();
     cJSON *japssid = cJSON_CreateString(apssid);
     cJSON_AddItemToObject(ap, WiFiSsidKey, japssid);
     free(apssid);
 
-    char *appass = WiFiConfig.Get_AP_pass();
+    char *appass = WiFiConfig->Get_AP_pass();
     cJSON *jappass = cJSON_CreateString(appass);
     cJSON_AddItemToObject(ap, "pass", jappass);
     free(appass);
 
     cJSON *status = nullptr;
 
-    if (WiFiConfig.Get_AP_Configured())
+    if (WiFiConfig->Get_AP_Configured())
       status = cJSON_CreateNumber((int8_t)1);
     else
       status = cJSON_CreateNumber((int8_t)0);
@@ -220,7 +221,7 @@ void WiFiManager::Loop()
     _subscriber->Done();
   }
 
-  if (event->isSubtype(EventSubtypeTypeWiFI_GetAPs))
+  if (event->isSubtype(EventSubtypeWiFI_GetAPs))
   {
     cJSON *aps = cJSON_CreateArray();
 
@@ -250,7 +251,7 @@ void WiFiManager::Loop()
     _subscriber->Done();
   }
 
-  if (event->isSubtype(EventSubtypeTypeWiFI_Connect))
+  if (event->isSubtype(EventSubtypeWiFI_Connect))
   {
     cJSON *jsonNada = cJSON_Parse((char *)event->getValue());
 
@@ -263,9 +264,9 @@ void WiFiManager::Loop()
         cJSON_IsString(tmpPass) &&
         ConnectTo(tmpSsid->valuestring, tmpPass->valuestring) == ESP_OK)
     {
-      WiFiConfig.Set_STA_ssid(tmpSsid->valuestring);
-      WiFiConfig.Set_STA_pass(tmpPass->valuestring);
-      WiFiConfig.Set_STA_Configured(true);
+      WiFiConfig->Set_STA_ssid(tmpSsid->valuestring);
+      WiFiConfig->Set_STA_pass(tmpPass->valuestring);
+      WiFiConfig->Set_STA_Configured(true);
       status = cJSON_CreateNumber(1);
 
       esp_netif_ip_info_t ip_info;
@@ -278,7 +279,7 @@ void WiFiManager::Loop()
     }
     else
     {
-      WiFiConfig.Set_STA_Configured(false);
+      WiFiConfig->Set_STA_Configured(false);
       status = cJSON_CreateNumber(0);
     }
 
@@ -295,10 +296,10 @@ void WiFiManager::Loop()
 esp_err_t WiFiManager::reloadApSettings()
 {
   wifi_config_t config = {};
-  if (WiFiConfig.Get_AP_Configured())
+  if (WiFiConfig->Get_AP_Configured())
   {
-    char *ssid = WiFiConfig.Get_AP_ssid();
-    char *pass = WiFiConfig.Get_AP_pass();
+    char *ssid = WiFiConfig->Get_AP_ssid();
+    char *pass = WiFiConfig->Get_AP_pass();
     ESP_LOGI(wifiTag, "ssid: %s, pass: %s", ssid, pass);
     config.ap.ssid_len = snprintf((char *)config.ap.ssid, 32, "%s", ssid);
     snprintf((char *)config.ap.password, 64, "%s", pass);
@@ -307,10 +308,10 @@ esp_err_t WiFiManager::reloadApSettings()
   }
   else
   {
-    char *ssid = WiFiConfig.Get_AP_hide_ssid();
+    char *ssid = WiFiConfig->Get_AP_hide_ssid();
     config.ap.ssid_len = snprintf((char *)config.ap.ssid, 32, "%s", ssid);
     config.ap.ssid_hidden = 1;
-    char *pass = WiFiConfig.Get_AP_hide_pass();
+    char *pass = WiFiConfig->Get_AP_hide_pass();
     ESP_LOGI(wifiTag, "ssid: %s, pass: %s", config.ap.ssid, pass);
     snprintf((char *)config.ap.password, 64, "%s", pass);
     free(pass);
@@ -327,10 +328,10 @@ esp_err_t WiFiManager::reloadStaSettings()
   wifi_mode_t mode = WIFI_MODE_NULL;
   esp_wifi_get_mode(&mode);
 
-  if (WiFiConfig.Get_STA_Configured())
+  if (WiFiConfig->Get_STA_Configured())
   {
-    char *ssid = WiFiConfig.Get_STA_ssid();
-    char *password = WiFiConfig.Get_STA_pass();
+    char *ssid = WiFiConfig->Get_STA_ssid();
+    char *password = WiFiConfig->Get_STA_pass();
 
     ret = ConnectTo(ssid, password);
 

@@ -13,31 +13,31 @@
 /// @brief Список WiFi мереж
 static esp_err_t post_api_aps_handler(httpd_req_t *req)
 {
-  return post_handler(req, EventTypeWiFI, EventSubtypeTypeWiFI_GetAPs, 0, true);
+  return post_handler(req, EventTypeWiFI, EventSubtypeWiFI_GetAPs, 0, true);
 }
 
 /// @brief Підєднатись до WiFi мережі
 static esp_err_t post_api_connect_handler(httpd_req_t *req)
 {
-  return post_handler(req, EventTypeWiFI, EventSubtypeTypeWiFI_Connect, 128, true);
+  return post_handler(req, EventTypeWiFI, EventSubtypeWiFI_Connect, 128, true);
 }
 
 /// @brief Змінити налаштування WiFi точки доступу
 static esp_err_t post_api_apsettings_handler(httpd_req_t *req)
 {
-  return post_handler(req, EventTypeWiFI, EventSubtypeTypeWiFI_ApSettings, 128, true);
+  return post_handler(req, EventTypeWiFI, EventSubtypeWiFI_ApSettings, 128, true);
 }
 
 /// @brief Вимкнути WiFi точку доступу
 static esp_err_t post_api_apoff_handler(httpd_req_t *req)
 {
-  return post_handler(req, EventTypeWiFI, EventSubtypeTypeWiFI_ApOff);
+  return post_handler(req, EventTypeWiFI, EventSubtypeWiFI_ApOff);
 }
 
 /// @brief Поточний режим роботи
 static esp_err_t post_api_status_handler(httpd_req_t *req)
 {
-  return post_handler(req, EventTypeWiFI, EventSubtypeTypeWiFI_Status, 0, true);
+  return post_handler(req, EventTypeWiFI, EventSubtypeWiFI_Status, 0, true);
 }
 
 // ╔════════════════════════════════════════════╗

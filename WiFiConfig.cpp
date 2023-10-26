@@ -1,6 +1,5 @@
 
 #include "WiFiConfig.h"
-#include "ESP_nvs.h"
 #include "esp_log.h"
 #include "string.h"
 #include "Core.h"
@@ -14,41 +13,41 @@ const static char *AP_passKey = "appass";
 
 char *WiFiConfig_t::Get_STA_ssid()
 {
-  return NVS.getCharArray(STA_ssidKey, "");
+  return NVS->getCharArray(STA_ssidKey, "");
 }
 void WiFiConfig_t::Set_STA_ssid(const char *ssid)
 {
-  NVS.setCharArray(STA_ssidKey, ssid);
+  NVS->setCharArray(STA_ssidKey, ssid);
 }
 
 char *WiFiConfig_t::Get_STA_pass()
 {
-  return NVS.getCharArray(STA_passKey, nullptr);
+  return NVS->getCharArray(STA_passKey, nullptr);
 }
 void WiFiConfig_t::Set_STA_pass(const char *pass)
 {
-  NVS.setCharArray(STA_passKey, pass);
+  NVS->setCharArray(STA_passKey, pass);
 }
 
 char *WiFiConfig_t::Get_AP_ssid()
 {
-  return NVS.getCharArray(AP_ssidKey, "esp");
+  return NVS->getCharArray(AP_ssidKey, "esp");
 }
 void WiFiConfig_t::Set_AP_ssid(const char *ssid)
 {
   if (ssid == nullptr)
-    NVS.erase(AP_ssidKey);
+    NVS->erase(AP_ssidKey);
   else
-    NVS.setCharArray(AP_ssidKey, ssid);
+    NVS->setCharArray(AP_ssidKey, ssid);
 }
 
 char *WiFiConfig_t::Get_AP_pass()
 {
-  return NVS.getCharArray(AP_passKey, "password");
+  return NVS->getCharArray(AP_passKey, "password");
 }
 void WiFiConfig_t::Set_AP_pass(const char *pass)
 {
-  NVS.setCharArray(AP_passKey, pass);
+  NVS->setCharArray(AP_passKey, pass);
 }
 
 char *WiFiConfig_t::Get_AP_hide_ssid()
@@ -75,20 +74,18 @@ char *WiFiConfig_t::Get_AP_hide_pass()
 
 bool WiFiConfig_t::Get_AP_Configured()
 {
-  return NVS.getBoolean(ApConfiguredKey, true);
+  return NVS->getBoolean(ApConfiguredKey, true);
 }
 void WiFiConfig_t::Set_AP_Configured(bool configured)
 {
-  NVS.setBoolean(ApConfiguredKey, configured);
+  NVS->setBoolean(ApConfiguredKey, configured);
 }
 
 bool WiFiConfig_t::Get_STA_Configured()
 {
-  return NVS.getBoolean(StaConfiguredKey, false);
+  return NVS->getBoolean(StaConfiguredKey, false);
 }
 void WiFiConfig_t::Set_STA_Configured(bool configured)
 {
-  NVS.setBoolean(StaConfiguredKey, configured);
+  NVS->setBoolean(StaConfiguredKey, configured);
 }
-
-WiFiConfig_t WiFiConfig;
