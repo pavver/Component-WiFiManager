@@ -5,6 +5,7 @@
 #include "lwip/ip4_addr.h"
 #include "Core.h"
 #include "cJSON.h"
+#include "esp_phy_init.h"
 
 const static char *WiFiSsidKey = "ssid";
 
@@ -65,6 +66,8 @@ void WiFiManager::Startup()
 
   free(host);
 
+  ESP_LOGI(wifiTag, "wifi init start");
+
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
 
   ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -78,10 +81,10 @@ void WiFiManager::Startup()
 
   _subscriber = eventManager->Subscribe("WiFi", EventTypeWiFI, 0);
 
-  reloadApSettings();
-  esp_wifi_set_mode(WIFI_MODE_APSTA);
+  ESP_ERROR_CHECK(reloadApSettings());
+  ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
   ESP_ERROR_CHECK(esp_wifi_start());
-  reloadStaSettings();
+  ESP_ERROR_CHECK(reloadStaSettings());
 }
 
 void WiFiManager::Loop()
@@ -300,7 +303,7 @@ esp_err_t WiFiManager::reloadApSettings()
   {
     char *ssid = WiFiConfig->Get_AP_ssid();
     char *pass = WiFiConfig->Get_AP_pass();
-    ESP_LOGI(wifiTag, "ssid: %s, pass: %s", ssid, pass);
+    ESP_LOGI(wifiTag, "AP ssid: %s, pass: %s", ssid, pass);
     config.ap.ssid_len = snprintf((char *)config.ap.ssid, 32, "%s", ssid);
     snprintf((char *)config.ap.password, 64, "%s", pass);
     free(pass);
@@ -312,7 +315,7 @@ esp_err_t WiFiManager::reloadApSettings()
     config.ap.ssid_len = snprintf((char *)config.ap.ssid, 32, "%s", ssid);
     config.ap.ssid_hidden = 1;
     char *pass = WiFiConfig->Get_AP_hide_pass();
-    ESP_LOGI(wifiTag, "ssid: %s, pass: %s", config.ap.ssid, pass);
+    ESP_LOGI(wifiTag, "hide AP ssid: %s, pass: %s", config.ap.ssid, pass);
     snprintf((char *)config.ap.password, 64, "%s", pass);
     free(pass);
     free(ssid);
@@ -325,8 +328,8 @@ esp_err_t WiFiManager::reloadApSettings()
 esp_err_t WiFiManager::reloadStaSettings()
 {
   esp_err_t ret = ESP_FAIL;
-  wifi_mode_t mode = WIFI_MODE_NULL;
-  esp_wifi_get_mode(&mode);
+  //wifi_mode_t mode = WIFI_MODE_NULL;
+  //esp_wifi_get_mode(&mode);
 
   if (WiFiConfig->Get_STA_Configured())
   {
@@ -337,6 +340,11 @@ esp_err_t WiFiManager::reloadStaSettings()
 
     free(ssid);
     free(password);
+  }
+  else
+  {
+    ret = ESP_OK; // no need to connect
+    //esp_wifi_set_mode(WIFI_MODE_AP);
   }
 
   http->Stop();
@@ -357,6 +365,7 @@ wifi_ap_record_t *WiFiManager::wifi_scan(uint16_t &ap_count)
 
 esp_err_t WiFiManager::ConnectTo(char *ssid, char *password)
 {
+  ESP_LOGI(wifiTag, "ConnectTo ssid: %s, pass: %s", ssid, password);
   uint16_t ap_count;
   wifi_ap_record_t *ap_info = wifi_scan(ap_count);
 
