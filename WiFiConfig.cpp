@@ -31,7 +31,11 @@ void WiFiConfig_t::Set_STA_pass(const char *pass)
 
 char *WiFiConfig_t::Get_AP_ssid()
 {
-  return NVS->getCharArray(AP_ssidKey, "esp");
+  char *ret = NVS->getCharArray(AP_ssidKey, nullptr);
+  if (ret != nullptr)
+    return ret;
+
+  return Get_AP_hide_ssid();
 }
 void WiFiConfig_t::Set_AP_ssid(const char *ssid)
 {
