@@ -6,6 +6,7 @@
 #include "Core.h"
 #include "cJSON.h"
 #include "esp_phy_init.h"
+#include "esp_event.h"
 
 const static char *WiFiSsidKey = "ssid";
 
@@ -104,15 +105,14 @@ void WiFiManager::Loop()
     reloadApSettings();
     _subscriber->Done();
   }
+  httpd_req_t *req = (httpd_req_t *)event->getAdditionalValue();
 
   if (event->isSubtype(EventSubtypeWiFI_ApSettings))
   {
     cJSON *jsonNada = cJSON_Parse((char *)event->getValue());
-
     cJSON *tmpSsid = cJSON_GetObjectItem(jsonNada, WiFiSsidKey);
     cJSON *tmpPass = cJSON_GetObjectItem(jsonNada, "pass");
-
-    cJSON *status;
+    int status = 0;
 
     if (cJSON_IsString(tmpSsid) &&
         cJSON_IsString(tmpPass) &&
@@ -125,143 +125,145 @@ void WiFiManager::Loop()
       WiFiConfig->Set_AP_pass(tmpPass->valuestring);
       WiFiConfig->Set_AP_Configured(true);
       reloadApSettings();
-      status = cJSON_CreateNumber(1);
-    }
-    else
-    {
-      status = cJSON_CreateNumber(0);
+      status = 1;
     }
 
     cJSON_Delete(jsonNada);
 
-    cJSON *json = cJSON_CreateObject();
-    cJSON_AddItemToObject(json, "status", status);
-
-    event->setValue(cJSON_PrintUnformatted(json));
-
-    cJSON_Delete(json);
+    httpd_resp_sendstr_chunk(req, "{\"status\":");
+    int len = snprintf(NULL, 0, "%d", status) + 1;
+    char *status_buffer = (char *)malloc(sizeof(char) * len);
+    snprintf(status_buffer, len, "%d", status);
+    httpd_resp_sendstr_chunk(req, status_buffer);
+    free(status_buffer);
+    httpd_resp_sendstr_chunk(req, "}");
 
     _subscriber->Done();
   }
 
-  if (event->isSubtype(EventSubtypeWiFI_Status))
+  else if (event->isSubtype(EventSubtypeWiFI_Status))
   {
     esp_netif_ip_info_t ip_info;
-    cJSON *json = cJSON_CreateObject();
-
-    cJSON *jsta = cJSON_CreateObject();
+    httpd_resp_sendstr_chunk(req, "{\"sta\":{");
 
     char *name = WiFiConfig->Get_AP_hide_ssid();
-    cJSON *jname = cJSON_CreateString(name);
-    cJSON_AddItemToObject(json, "name", jname);
+    httpd_resp_sendstr_chunk(req, "\"name\":\"");
+    httpd_resp_sendstr_chunk(req, name);
+    httpd_resp_sendstr_chunk(req, "\",");
     free(name);
 
     if (WiFiConfig->Get_STA_Configured())
     {
       esp_netif_get_ip_info(wifiSTA, &ip_info);
-      char *staip = (char *)malloc(sizeof(char) * 16);
-      snprintf(staip, 16, IPSTR, IP2STR(&ip_info.ip));
-      cJSON *staipj = cJSON_CreateString(staip);
-      cJSON_AddItemToObject(jsta, "ip", staipj);
-      free(staip);
+      char staip[16];
+      snprintf(staip, sizeof(staip), IPSTR, IP2STR(&ip_info.ip));
+      httpd_resp_sendstr_chunk(req, "\"ip\":\"");
+      httpd_resp_sendstr_chunk(req, staip);
+      httpd_resp_sendstr_chunk(req, "\",");
 
       char *stassid = WiFiConfig->Get_STA_ssid();
-      cJSON *jstassid = cJSON_CreateString(stassid);
-      cJSON_AddItemToObject(jsta, WiFiSsidKey, jstassid);
+      httpd_resp_sendstr_chunk(req, "\"ssid\":\"");
+      httpd_resp_sendstr_chunk(req, stassid);
+      httpd_resp_sendstr_chunk(req, "\",");
       free(stassid);
 
       wifi_ap_record_t wifidata;
+      int8_t wifi_status = (esp_wifi_sta_get_ap_info(&wifidata) == ESP_OK) ? 1 : 0;
+      int len = snprintf(NULL, 0, "%d", wifi_status) + 1;
+      char *status_buffer = (char *)malloc(sizeof(char) * len);
+      snprintf(status_buffer, len, "%d", wifi_status);
+      httpd_resp_sendstr_chunk(req, "\"status\":");
+      httpd_resp_sendstr_chunk(req, status_buffer);
+      free(status_buffer);
 
-      cJSON *status;
-      if (esp_wifi_sta_get_ap_info(&wifidata) == ESP_OK)
+      if (wifi_status == 1)
       {
-        status = cJSON_CreateNumber((int8_t)1);
-        cJSON *rssi = cJSON_CreateNumber(wifidata.rssi);
-        cJSON_AddItemToObject(jsta, "rssi", rssi);
+        len = snprintf(NULL, 0, "%d", wifidata.rssi) + 1;
+        char *rssi_buffer = (char *)malloc(sizeof(char) * len);
+        snprintf(rssi_buffer, len, "%d", wifidata.rssi);
+        httpd_resp_sendstr_chunk(req, ",\"rssi\":");
+        httpd_resp_sendstr_chunk(req, rssi_buffer);
+        free(rssi_buffer);
       }
-      else
-      {
-        status = cJSON_CreateNumber((int8_t)0);
-      }
-      cJSON_AddItemToObject(jsta, "status", status);
     }
     else
     {
-      cJSON *status = cJSON_CreateNumber((int8_t)-1);
-      cJSON_AddItemToObject(jsta, "status", status);
+      httpd_resp_sendstr_chunk(req, "\"status\":-1");
     }
-    cJSON_AddItemToObject(json, "sta", jsta);
 
-    cJSON *ap = cJSON_CreateObject();
+    httpd_resp_sendstr_chunk(req, "},\"ap\":{");
+
     char *apssid = WiFiConfig->Get_AP_ssid();
-    cJSON *japssid = cJSON_CreateString(apssid);
-    cJSON_AddItemToObject(ap, WiFiSsidKey, japssid);
+    httpd_resp_sendstr_chunk(req, "\"ssid\":\"");
+    httpd_resp_sendstr_chunk(req, apssid);
+    httpd_resp_sendstr_chunk(req, "\",");
     free(apssid);
 
     char *appass = WiFiConfig->Get_AP_pass();
-    cJSON *jappass = cJSON_CreateString(appass);
-    cJSON_AddItemToObject(ap, "pass", jappass);
+    httpd_resp_sendstr_chunk(req, "\"pass\":\"");
+    httpd_resp_sendstr_chunk(req, appass);
+    httpd_resp_sendstr_chunk(req, "\",");
     free(appass);
 
-    cJSON *status = nullptr;
-
-    if (WiFiConfig->Get_AP_Configured())
-      status = cJSON_CreateNumber((int8_t)1);
-    else
-      status = cJSON_CreateNumber((int8_t)0);
+    int8_t ap_status = WiFiConfig->Get_AP_Configured() ? 1 : 0;
+    int len = snprintf(NULL, 0, "%d", ap_status) + 1;
+    char *ap_status_buffer = (char *)malloc(sizeof(char) * len);
+    snprintf(ap_status_buffer, len, "%d", ap_status);
+    httpd_resp_sendstr_chunk(req, "\"status\":");
+    httpd_resp_sendstr_chunk(req, ap_status_buffer);
+    free(ap_status_buffer);
 
     esp_netif_get_ip_info(wifiAP, &ip_info);
-    char *apip = (char *)malloc(sizeof(char) * 16);
-    snprintf(apip, 16, IPSTR, IP2STR(&ip_info.ip));
-    cJSON *apipj = cJSON_CreateString(apip);
-    cJSON_AddItemToObject(ap, "ip", apipj);
+    char apip[16];
+    snprintf(apip, sizeof(apip), IPSTR, IP2STR(&ip_info.ip));
+    httpd_resp_sendstr_chunk(req, ",\"ip\":\"");
+    httpd_resp_sendstr_chunk(req, apip);
+    httpd_resp_sendstr_chunk(req, "\"}}");
 
-    cJSON_AddItemToObject(ap, "status", status);
-    cJSON_AddItemToObject(json, "ap", ap);
-
-    event->setValue(cJSON_PrintUnformatted(json));
-    cJSON_Delete(json);
     _subscriber->Done();
   }
 
-  if (event->isSubtype(EventSubtypeWiFI_GetAPs))
+  else if (event->isSubtype(EventSubtypeWiFI_GetAPs))
   {
-    cJSON *aps = cJSON_CreateArray();
-
     uint16_t ap_count;
     wifi_ap_record_t *ap_info = wifi_scan(ap_count);
 
+    httpd_resp_sendstr_chunk(req, "[");
     for (int i = 0; i < ap_count; i++)
     {
-      cJSON *ap = cJSON_CreateObject();
+      if (i > 0)
+        httpd_resp_sendstr_chunk(req, ",");
 
-      cJSON *ssid = cJSON_CreateString((char *)ap_info[i].ssid);
-      cJSON_AddItemToObject(ap, WiFiSsidKey, ssid);
+      httpd_resp_sendstr_chunk(req, "{\"ssid\":\"");
+      httpd_resp_sendstr_chunk(req, (char *)ap_info[i].ssid);
+      httpd_resp_sendstr_chunk(req, "\",\"rssi\":");
 
-      cJSON *rssi = cJSON_CreateNumber(ap_info[i].rssi);
-      cJSON_AddItemToObject(ap, "rssi", rssi);
+      int len = snprintf(NULL, 0, "%d", ap_info[i].rssi) + 1;
+      char *rssi_buffer = (char *)malloc(sizeof(char) * len);
+      snprintf(rssi_buffer, len, "%d", ap_info[i].rssi);
+      httpd_resp_sendstr_chunk(req, rssi_buffer);
+      free(rssi_buffer);
 
-      cJSON *authmode = cJSON_CreateNumber(ap_info[i].authmode);
-      cJSON_AddItemToObject(ap, "authmode", authmode);
+      httpd_resp_sendstr_chunk(req, ",\"authmode\":");
+      len = snprintf(NULL, 0, "%d", ap_info[i].authmode) + 1;
+      char *authmode_buffer = (char *)malloc(sizeof(char) * len);
+      snprintf(authmode_buffer, len, "%d", ap_info[i].authmode);
+      httpd_resp_sendstr_chunk(req, authmode_buffer);
+      free(authmode_buffer);
 
-      cJSON_AddItemToArray(aps, ap);
+      httpd_resp_sendstr_chunk(req, "}");
     }
+    httpd_resp_sendstr_chunk(req, "]");
 
     free(ap_info);
-
-    event->setValue(cJSON_PrintUnformatted(aps));
-    cJSON_Delete(aps);
     _subscriber->Done();
   }
 
-  if (event->isSubtype(EventSubtypeWiFI_Connect))
+  else if (event->isSubtype(EventSubtypeWiFI_Connect))
   {
     cJSON *jsonNada = cJSON_Parse((char *)event->getValue());
-
     cJSON *tmpSsid = cJSON_GetObjectItem(jsonNada, WiFiSsidKey);
     cJSON *tmpPass = cJSON_GetObjectItem(jsonNada, "pass");
-
-    cJSON *status;
 
     if (cJSON_IsString(tmpSsid) &&
         cJSON_IsString(tmpPass) &&
@@ -270,28 +272,23 @@ void WiFiManager::Loop()
       WiFiConfig->Set_STA_ssid(tmpSsid->valuestring);
       WiFiConfig->Set_STA_pass(tmpPass->valuestring);
       WiFiConfig->Set_STA_Configured(true);
-      status = cJSON_CreateNumber(1);
 
       esp_netif_ip_info_t ip_info;
       esp_netif_get_ip_info(wifiSTA, &ip_info);
-      char *staip = (char *)malloc(sizeof(char) * 16);
-      snprintf(staip, 16, IPSTR, IP2STR(&ip_info.ip));
-      cJSON *staipj = cJSON_CreateString(staip);
-      cJSON_AddItemToObject(jsonNada, "ip", staipj);
-      free(staip);
+      char staip[16];
+      snprintf(staip, sizeof(staip), IPSTR, IP2STR(&ip_info.ip));
+
+      httpd_resp_sendstr_chunk(req, "{\"status\":1,\"ip\":\"");
+      httpd_resp_sendstr_chunk(req, staip);
+      httpd_resp_sendstr_chunk(req, "\"}");
     }
     else
     {
       WiFiConfig->Set_STA_Configured(false);
-      status = cJSON_CreateNumber(0);
+      httpd_resp_sendstr_chunk(req, "{\"status\":0}");
     }
 
-    cJSON_AddItemToObject(jsonNada, "status", status);
-
-    event->setValue(cJSON_PrintUnformatted(jsonNada));
-
     cJSON_Delete(jsonNada);
-
     _subscriber->Done();
   }
 }
