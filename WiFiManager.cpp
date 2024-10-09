@@ -328,8 +328,6 @@ esp_err_t WiFiManager::reloadApSettings()
 esp_err_t WiFiManager::reloadStaSettings()
 {
   esp_err_t ret = ESP_FAIL;
-  //wifi_mode_t mode = WIFI_MODE_NULL;
-  //esp_wifi_get_mode(&mode);
 
   if (WiFiConfig->Get_STA_Configured())
   {
@@ -340,11 +338,17 @@ esp_err_t WiFiManager::reloadStaSettings()
 
     free(ssid);
     free(password);
+
+    if (!WiFiConfig->Get_AP_Configured())
+    {
+      WiFiConfig->Set_AP_Configured(true);
+      reloadApSettings();
+    }
   }
   else
   {
     ret = ESP_OK; // no need to connect
-    //esp_wifi_set_mode(WIFI_MODE_AP);
+    // esp_wifi_set_mode(WIFI_MODE_AP);
   }
 
   http->Stop();
@@ -429,4 +433,3 @@ esp_err_t WiFiManager::ConnectTo(char *ssid, char *password, wifi_auth_mode_t au
 
   return ret;
 }
-
