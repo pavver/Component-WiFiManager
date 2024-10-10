@@ -58,7 +58,7 @@ char *WiFiConfig_t::Get_AP_hide_ssid()
 {
   char *name = GetUniqueDeviceID();
   char *ret = (char *)malloc((sizeof(char) * 32));
-  snprintf((char *)ret, 32, "pvLed_%s", name);
+  snprintf((char *)ret, 32, CONFIG_WIFI_AP_NAME_PREFIX "%s", name);
   free(name);
   return ret;
 }
